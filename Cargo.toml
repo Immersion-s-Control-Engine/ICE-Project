@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glfw = "0.51.0"
+glfw = {version="0.51.0", features=["vulkan"]}
 vulkano = "0.33.0"
-winit = "0.28.3"
+
+[immersion_control_engine.dev]
+opt-level = 1 
