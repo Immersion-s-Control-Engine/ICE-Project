@@ -1,8 +1,5 @@
 pub mod Window {
-    use std::sync::Arc;
-
     use glfw::{Action, Key, WindowHint, ClientApiHint, Context};
-    use vulkano::VulkanLibrary;
 
     pub fn create_window() {
     // This initiates glfw.
@@ -38,13 +35,6 @@ pub mod Window {
     pub fn get_extensions() -> Vec<String> {
         let glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
         glfw.get_required_instance_extensions().unwrap()
-    }
-
-    pub fn check_supported() {
-        let library: Arc<VulkanLibrary> = VulkanLibrary::new().expect("no local Vulkan library/DLL");
-        for (extension, boolean) in library.supported_extensions().into_iter() {
-            println!("{} : {}", extension,boolean);
-        }
     }
 }
 

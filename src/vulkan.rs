@@ -2,8 +2,9 @@ pub mod Vulkan {
     // Just a recap, Arc is used to create clones to the same memory address.
     use std::sync::Arc;
     use vulkano::device::physical::PhysicalDevice;
+    use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo, QueueFlags};
     use vulkano::instance::{Instance, InstanceCreateInfo, InstanceExtensions};
-    use vulkano::{VulkanLibrary};
+    use vulkano::VulkanLibrary;
 
     use crate::window::Window;
 
@@ -32,6 +33,7 @@ pub mod Vulkan {
         instance
     }
 
+    // This function is used to create a physical device.
     pub fn create_device(instance: Arc<Instance>) -> Option<Arc<PhysicalDevice>> {
         for device in instance.enumerate_physical_devices().unwrap() {
             if device.properties().device_name.contains("GeForce") {
@@ -39,5 +41,38 @@ pub mod Vulkan {
             }
         }
         None
+    }
+
+    // This device is used to get queue families based on the type of queue required.
+    pub fn get_queue_families(
+        physical_device: Arc<PhysicalDevice>,
+        queue_flag:QueueFlags
+    ) -> (Arc<Device>, impl ExactSizeIterator) {
+        let queue_family_index = physical_device
+            .queue_family_properties()
+            .iter()
+            .enumerate()
+            .position(|(_, queue_family_property)| {
+                queue_family_property
+                    .queue_flags
+                    .contains(queue_flag)
+            })
+            .expect("Couldn't find a graphical queue family")
+            as u32;
+            
+            // Device in this case is a logical device.
+        let (device, queues) = Device::new(
+            physical_device,
+            DeviceCreateInfo {
+                // here we pass the desired queue family to use by index
+                queue_create_infos: vec![QueueCreateInfo {
+                    queue_family_index,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+        )
+        .expect("failed to create device");
+        (device, queues)
     }
 }
