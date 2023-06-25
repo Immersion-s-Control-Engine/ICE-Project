@@ -1,34 +1,18 @@
 pub mod Window {
-    use glfw::{Action, Key, WindowHint, ClientApiHint, Context};
+    use std::sync::Arc;
+    use vulkano::{instance::Instance, swapchain::Surface};
+    use vulkano_win::VkSurfaceBuild;
+    use winit::{event_loop::EventLoop, window::{WindowBuilder}, dpi::Size};
 
-    pub fn create_window() {
-    // This initiates glfw.
-    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
-    // This creates an instance of a window in glfw.
-    let (mut window, events) = glfw.create_window(300, 300, "ICE", glfw::WindowMode::Windowed)
-        .expect("Failed to create GLFW window.");
-    //Setting the window hints.
-    glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
-    glfw.window_hint(WindowHint::Resizable(false));
-
-    // Used to register key actions and give feedback to window.
-    window.set_key_polling(true);
-
-
-    window.make_current();
-
-    // This sets a loop to keep the window open.
-    while !window.should_close() {
-        glfw.poll_events();
-        for (_, event) in glfw::flush_messages(&events) {
-            match event {
-                glfw::WindowEvent::Key(Key::Escape, _, Action::Release, _) => {
-                    window.set_should_close(true)
-                }
-                _ => {}
-            }
-        }
-    }
+    pub fn create_window(instance: &Arc<Instance>) -> (EventLoop<()>, Arc<Surface>) {
+        let event_loop = EventLoop::new();  // ignore this for now
+        let surface = WindowBuilder::new()
+        .with_inner_size(Size::Physical(winit::dpi::PhysicalSize { width: 600, height: 600 }))
+        .with_resizable(false)
+        .with_title("ICE")
+        .build_vk_surface(&event_loop, instance.clone())
+        .unwrap();
+        (event_loop, surface)
     }
 
     // Gets the required extensions to work with Vulkan API.
