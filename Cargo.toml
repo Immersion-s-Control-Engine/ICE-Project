@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 glfw = {version="0.51.0", features=["vulkan"]}
 vulkano = "0.33.0"
+vulkano-shaders = "0.33.0"
 vulkano-win = "0.33.0"
 winit = "0.28.6"
 
