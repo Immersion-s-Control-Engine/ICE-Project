@@ -5,8 +5,11 @@ pub mod Vulkan {
     use vulkano::device::{
         Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo, QueueFlags,
     };
+    use vulkano::image::sys::ImageCreateInfo;
+    use vulkano::image::view::ImageView;
     use vulkano::image::{ImageUsage, SwapchainImage};
     use vulkano::instance::{Instance, InstanceCreateInfo, InstanceExtensions};
+    use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
     use vulkano::swapchain::{Surface, Swapchain, SwapchainCreateInfo};
     use vulkano::VulkanLibrary;
     use winit::window::Window;
@@ -117,7 +120,6 @@ pub mod Vulkan {
             .expect("failed to get surface capabilities");
         let window = surface.object().unwrap().downcast_ref::<Window>().unwrap();
         let dimensions: [u32; 2] = window.inner_size().into();
-
         let composite_alpha: vulkano::swapchain::CompositeAlpha =
             caps.supported_composite_alpha.into_iter().next().unwrap();
         let image_format: Option<vulkano::format::Format> = Some(
@@ -132,14 +134,55 @@ pub mod Vulkan {
             SwapchainCreateInfo {
                 min_image_count: caps.min_image_count + 1, // How many buffers to use in the swapchain
                 image_format,
+                present_mode: vulkano::swapchain::PresentMode::Fifo,
                 image_extent: dimensions,
+                image_color_space: vulkano::swapchain::ColorSpace::SrgbNonLinear,
                 image_usage: ImageUsage::COLOR_ATTACHMENT, // What the images are going to be used for
                 composite_alpha,
                 ..Default::default()
             },
         )
         .unwrap();
-    println!("{:?}", caps.max_image_count);
+
         (swapchain, images)
+    }
+
+    pub fn get_render_pass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {
+        vulkano::single_pass_renderpass!(
+            device,
+            attachments: {
+                color: {
+                    load: Clear,
+                    store: Store,
+                    format: swapchain.image_format(), // set the format the same as the swapchain
+                    samples: 1,
+                },
+            },
+            pass: {
+                color: [color],
+                depth_stencil: {},
+            },
+        )
+        .unwrap()
+    }
+
+    pub fn get_framebuffers(
+        images: &Vec<Arc<SwapchainImage>>,
+        render_pass: &Arc<RenderPass>,
+    ) -> Vec<Arc<Framebuffer>> {
+        images
+            .iter()
+            .map(|image| {
+                let view = ImageView::new_default(image.clone()).unwrap();
+                Framebuffer::new(
+                    render_pass.clone(),
+                    FramebufferCreateInfo {
+                        attachments: vec![view],
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>()
     }
 }
