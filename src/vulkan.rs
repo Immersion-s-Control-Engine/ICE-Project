@@ -26,7 +26,6 @@ pub mod Vulkan {
 
         // Fetching extensions to be enabled.
         let extensions: InstanceExtensions = vulkano_win::required_extensions(&library);
-        println!("{:?}", extensions);
         let instance: Arc<Instance> = Instance::new(
             library,
             InstanceCreateInfo {

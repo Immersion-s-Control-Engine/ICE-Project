@@ -1,6 +1,8 @@
+pub mod shaders;
 pub mod vulkan;
 pub mod window;
 
+use shaders::{fs, vs};
 use vulkan::*;
 use vulkano::device::QueueFlags;
 use window::*;
@@ -28,6 +30,10 @@ fn main() {
 
     // Destination for rendering.
     let frame_buffers = Vulkan::get_framebuffers(&images, &render_pass);
+
+    // Loading fragment and vertex shaders
+    let vs = vs::load(device.clone()).unwrap();
+    let fs = fs::load(device.clone()).unwrap();
 
     event_loop.run(|event, _, control_flow| match event {
         Event::WindowEvent {
