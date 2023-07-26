@@ -2,16 +2,19 @@
 name = "immersion_control_engine"
 version = "0.1.0"
 edition = "2021"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 
 [dependencies]
-glfw = {version="0.51.0", features=["vulkan"]}
-shaderc = {version="0.8.2", features=["build-from-source"]}
-shaderc-sys = {version="0.8.2", features=["build-from-source"]}
-vulkano = "0.33.0"
-vulkano-shaders = "0.33.0"
-vulkano-win = "0.33.0"
+tokio = { version = "1.29.1", features = ["full"] }
+wgpu = "0.12.0"
+cgmath = "0.18"
+env_logger = "0.10.0"
+futures = "0.3"
+gfx-hal = "0.9"
+image = "0.24"
+log = "0.4"
+pollster = "0.3.0"
 winit = "0.28.6"
-
-[immersion_control_engine.dev]
-opt-level = 1 
+bytemuck = { version = "1.4", features = ["derive"] }
+anyhow = "1.0"
+rand = "0.8"

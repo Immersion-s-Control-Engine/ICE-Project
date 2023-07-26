@@ -1,47 +1,83 @@
-pub mod shaders;
-pub mod vulkan;
+pub mod config;
+pub mod device;
+pub mod instance;
+pub mod pipeline;
+pub mod shader;
 pub mod window;
 
-use shaders::{fs, vs};
-use vulkan::*;
-use vulkano::device::QueueFlags;
-use window::*;
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::ControlFlow;
+use config::get_config;
+use device::get_device;
+use instance::get_instance;
+use pipeline::get_render_pipeline;
+use shader::get_shaders;
+use window::get_window;
+use winit::{
+    event::{Event, WindowEvent},
+    event_loop::ControlFlow,
+};
 
-fn main() {
-    // Vulkan Instance
-    let instance = Vulkan::create_instance();
+#[tokio::main]
+async fn main() {
+    let (event_loop, window) = get_window();
+    let (instance, surface, adapter) = get_instance(window.clone()).await;
+    let (device, queue) = get_device(adapter.clone()).await;
+    let (mut config, format) = get_config(adapter.clone(), surface.clone(), window.clone()).await;
+    surface.configure(device.as_ref(), &config);
+    let shader = get_shaders(device.clone());
+    let (pipeline_layout, render_pipeline) =
+        get_render_pipeline(device.clone(), shader.clone(), format.clone());
 
-    // Event loop and surface for an interface between vulkan and window.
-    let (event_loop, surface) = Window::create_window(&instance);
+    event_loop.run(move |event, _, control_flow| {
+        let _ = (&instance, &adapter, &shader, &pipeline_layout);
+        *control_flow = ControlFlow::Wait;
 
-    // GPU selected to be used.
-    let physical_device = Vulkan::create_device(instance.clone(), surface.clone()).unwrap();
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                // Recreate the surface with the new size
+                config.width = size.width;
+                config.height = size.height;
+                surface.configure(&device, &config);
+            }
+            Event::RedrawRequested(_) => {
+                let frame = surface.get_current_texture().unwrap();
+                let view = frame
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+                let mut encoder =
+                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                {
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.05,
+                                    g: 0.062,
+                                    b: 0.08,
+                                    a: 1.0,
+                                }),
+                                store: true,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                    });
+                    rpass.set_pipeline(&render_pipeline);
+                    rpass.draw(0..3, 0..1);
+                }
 
-    // Abstraction to the physical device and the queue family indexes.
-    let (device, queue) = Vulkan::get_queue_families(physical_device.clone(), QueueFlags::GRAPHICS);
-
-    // Swapchain to manage the way images are displayed, and array of images to be displayed.
-    let (swap_chain, images) = Vulkan::create_swapchain(physical_device, surface, device.clone());
-
-    // Used to store info of the framebuffer, and other subpasses to be used while rendering
-    let render_pass = Vulkan::get_render_pass(device.clone(), &swap_chain);
-
-    // Destination for rendering.
-    let frame_buffers = Vulkan::get_framebuffers(&images, &render_pass);
-
-    // Loading fragment and vertex shaders
-    let vs = vs::load(device.clone()).unwrap();
-    let fs = fs::load(device.clone()).unwrap();
-
-    event_loop.run(|event, _, control_flow| match event {
-        Event::WindowEvent {
-            event: WindowEvent::CloseRequested,
-            ..
-        } => {
-            *control_flow = ControlFlow::Exit;
+                queue.submit(Some(encoder.finish()));
+                frame.present();
+            }
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            _ => {}
         }
-        _ => (),
     });
 }
