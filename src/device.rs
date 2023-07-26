@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use wgpu::{self, *};
-use winit::window::Window;
 
 pub async fn get_device(adapter: Arc<Adapter>) -> (Arc<Device>, Arc<Queue>) {
     let (device, queue) = adapter
@@ -17,4 +16,3 @@ pub async fn get_device(adapter: Arc<Adapter>) -> (Arc<Device>, Arc<Queue>) {
         .expect("Failed to create device!");
     (Arc::new(device), Arc::new(queue))
 }
-

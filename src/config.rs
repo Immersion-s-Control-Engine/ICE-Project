@@ -10,7 +10,7 @@ pub async fn get_config(
 ) -> (SurfaceConfiguration, Arc<TextureFormat>) {
     let size = window.inner_size();
     let format = surface.get_preferred_format(&adapter).unwrap();
-    let mut config = SurfaceConfiguration {
+    let config = SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: format,
         width: size.width,
