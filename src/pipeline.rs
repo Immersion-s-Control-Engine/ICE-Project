@@ -16,27 +16,28 @@ pub fn get_render_pipeline(
     let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
         label: None,
         layout: Some(&pipeline_layout),
-        vertex: VertexState {
-            module: shader.as_ref(),
+        vertex: wgpu::VertexState {
+            module: &shader,
             entry_point: "vs_main",
             buffers: &[],
         },
-        fragment: Some(FragmentState {
-            module: shader.as_ref(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
             entry_point: "fs_main",
-            targets: &[Some(wgpu::ColorTargetState {
+            targets: &[ColorTargetState {
                 format: *format,
                 blend: Some(wgpu::BlendState {
                     color: wgpu::BlendComponent::REPLACE,
                     alpha: wgpu::BlendComponent::REPLACE,
                 }),
                 write_mask: wgpu::ColorWrites::ALL,
-            })],
+            }],
         }),
-        primitive: PrimitiveState::default(),
+        primitive: wgpu::PrimitiveState::default(),
         depth_stencil: None,
-        multisample: MultisampleState::default(),
+        multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
+
     (Arc::new(pipeline_layout), Arc::new(render_pipeline))
 }

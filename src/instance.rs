@@ -4,11 +4,8 @@ use wgpu::{self, *};
 use winit::window::Window;
 
 pub async fn get_instance(window: Arc<Window>) -> (Arc<Instance>, Arc<Surface>, Arc<Adapter>) {
-    let instance = Instance::new(InstanceDescriptor {
-        backends: Backends::VULKAN,
-        dx12_shader_compiler: Dx12Compiler::default(),
-    });
-    let surface = unsafe { instance.create_surface(window.as_ref()).unwrap() };
+    let instance = Instance::new(Backends::VULKAN);
+    let surface = unsafe { instance.create_surface::<Window>(window.as_ref()) };
     let adapter = instance
         .request_adapter(&RequestAdapterOptions {
             power_preference: PowerPreference::default(),

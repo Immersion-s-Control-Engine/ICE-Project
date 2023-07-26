@@ -9,18 +9,13 @@ pub async fn get_config(
     window: Arc<Window>,
 ) -> (SurfaceConfiguration, Arc<TextureFormat>) {
     let size = window.inner_size();
-    let format = surface
-        .get_default_config(&adapter, size.width, size.height)
-        .unwrap()
-        .format;
-    let config = SurfaceConfiguration {
-        usage: TextureUsages::RENDER_ATTACHMENT,
+    let format = surface.get_preferred_format(&adapter).unwrap();
+    let mut config = SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: format,
         width: size.width,
         height: size.height,
-        present_mode: PresentMode::Mailbox,
-        alpha_mode: CompositeAlphaMode::Auto,
-        view_formats: Default::default(),
+        present_mode: wgpu::PresentMode::Mailbox,
     };
     (config, Arc::new(format))
 }

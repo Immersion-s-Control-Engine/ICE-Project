@@ -10,6 +10,7 @@ use device::get_device;
 use instance::get_instance;
 use pipeline::get_render_pipeline;
 use shader::get_shaders;
+use wgpu::RenderPassColorAttachment;
 use window::get_window;
 use winit::{
     event::{Event, WindowEvent},
@@ -51,7 +52,7 @@ async fn main() {
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        color_attachments: &[RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
@@ -63,7 +64,7 @@ async fn main() {
                                 }),
                                 store: true,
                             },
-                        })],
+                        }],
                         depth_stencil_attachment: None,
                     });
                     rpass.set_pipeline(&render_pipeline);
