@@ -867,7 +867,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "immersion_control_engine"
+name = "immersions_control_engine"
 version = "0.1.0"
 dependencies = [
  "anyhow",

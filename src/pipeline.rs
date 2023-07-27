@@ -12,7 +12,27 @@ pub fn get_render_pipeline(
         bind_group_layouts: &[],
         push_constant_ranges: &[],
     });
+    let mut primitive_type = "point-list";
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        primitive_type = &args[1];
+    }
 
+    let mut topology = wgpu::PrimitiveTopology::PointList;
+    let mut index_format = None;
+    if primitive_type == "line-list" {
+        topology = wgpu::PrimitiveTopology::LineList;
+        index_format = None;
+    } else if primitive_type == "line-strip" {
+        topology = wgpu::PrimitiveTopology::LineStrip;
+        index_format = Some(wgpu::IndexFormat::Uint32);
+    } else if primitive_type == "triangle-strip" {
+        topology = wgpu::PrimitiveTopology::TriangleStrip;
+        index_format = Some(IndexFormat::Uint32);
+    } else if primitive_type == "triangle-list" {
+        topology = wgpu::PrimitiveTopology::TriangleList;
+        index_format = Some(IndexFormat::Uint32);
+    }
     let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
         label: None,
         layout: Some(&pipeline_layout),
@@ -26,16 +46,20 @@ pub fn get_render_pipeline(
             entry_point: "fs_main",
             targets: &[ColorTargetState {
                 format: *format,
-                blend: Some(wgpu::BlendState {
-                    color: wgpu::BlendComponent::REPLACE,
-                    alpha: wgpu::BlendComponent::REPLACE,
+                blend: Some(BlendState {
+                    color: BlendComponent::REPLACE,
+                    alpha: BlendComponent::REPLACE,
                 }),
-                write_mask: wgpu::ColorWrites::ALL,
+                write_mask: ColorWrites::ALL,
             }],
         }),
-        primitive: wgpu::PrimitiveState::default(),
+        primitive: PrimitiveState {
+            topology: topology,
+            strip_index_format: index_format,
+            ..Default::default()
+        },
         depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
+        multisample: MultisampleState::default(),
         multiview: None,
     });
 
