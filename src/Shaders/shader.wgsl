@@ -1,37 +1,22 @@
+struct Uniforms {
+    mvpMatrix : mat4x4<f32>;
+};
+[[binding(0), group(0)]] var<uniform> uniforms : Uniforms;
 
 struct Output {
     [[builtin(position)]] position : vec4<f32>;
-    [[location(0)]] v_color: vec4<f32>;
+    [[location(0)]] vColor : vec4<f32>;
 };
 
 [[stage(vertex)]]
-fn vs_main([[builtin(vertex_index)]] in_vertex_index: u32) -> Output {    
-    var pos = array<vec2<f32>,6>(
-        vec2<f32>(-0.5,  0.7),
-        vec2<f32>( 0.3,  0.6),
-        vec2<f32>( 0.5,  0.3),
-        vec2<f32>( 0.4, -0.5),
-        vec2<f32>(-0.4, -0.4),
-        vec2<f32>(-0.3,  0.2)
-    );
-
-    var colors = array<vec3<f32>,6>(
-        vec3<f32>(0.1,  0.0, 0.0),
-        vec3<f32>( 0.0,  0.1, 0.0),
-        vec3<f32>( 0.0,  0.0, 0.1),
-        vec3<f32>( 0.1, 0.0, 0.1),
-        vec3<f32>(0.1, 0.1, 0.0),
-        vec3<f32>(0.0,  0.1, 0.1)
-    );
+fn vs_main([[location(0)]] pos: vec4<f32>, [[location(1)]] color: vec4<f32>) -> Output {
     var output: Output;
-    output.position = vec4<f32>(pos[in_vertex_index], 0.0, 1.0);
-    output.v_color = vec4<f32>(colors[in_vertex_index],1.0);
+    output.position = uniforms.mvpMatrix * pos;
+    output.vColor = color;
     return output;
 }
 
-// fragment shader
-
 [[stage(fragment)]]
-fn fs_main([[location(0)]] v_color:vec4<f32>) -> [[location(0)]] vec4<f32> {
-    return v_color;
+fn fs_main([[location(0)]] vColor: vec4<f32>) -> [[location(0)]] vec4<f32> {
+    return vColor;
 }

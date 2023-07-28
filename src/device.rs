@@ -6,7 +6,7 @@ pub async fn get_device(adapter: Arc<Adapter>) -> (Arc<Device>, Arc<Queue>) {
     let (device, queue) = adapter
         .request_device(
             &DeviceDescriptor {
-                label: None,
+                label: Some("Logical Device"),
                 features: Features::empty(),
                 limits: Limits::default(),
             },
