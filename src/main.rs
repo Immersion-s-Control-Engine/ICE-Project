@@ -7,12 +7,12 @@ pub mod vertex_data;
 pub mod window;
 
 use immersions_control_engine::State;
-use wgpu;
 use window::get_window;
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
 };
+
 fn main() {
     let (event_loop, window) = get_window();
     let mut state = pollster::block_on(State::new(window.clone()));

@@ -58,7 +58,7 @@ impl State {
     pub async fn new(window: Arc<Window>) -> Self {
         let init = InitWgpu::new(window).await;
         let shader = get_shaders(init.device.clone());
-        let light_data = light([0.0, 1.0, 0.0], [1.0, 1.0, 0.0], 0.1, 0.6, 0.3, 30.0);
+        let light_data = light([1.0, 0.0, 0.0], [1.0, 1.0, 0.0], 0.1, 0.8, 0.3, 33.0);
 
         // uniform data
         let (

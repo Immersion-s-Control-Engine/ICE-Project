@@ -258,13 +258,14 @@ pub fn get_render_pipeline(
 
 fn create_vertices() -> Vec<Vertex> {
     let pos = vertex_data::cube_positions();
-    let col = vertex_data::cube_colors();
+    let normal = vertex_data::cube_normals();
     let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
     for i in 0..pos.len() {
-        data.push(vertex(pos[i], col[i]));
+        data.push(vertex(pos[i], normal[i]));
     }
     data.to_vec()
 }
+
 pub fn create_view(
     camera_position: Point3<f32>,
     look_direction: Point3<f32>,
