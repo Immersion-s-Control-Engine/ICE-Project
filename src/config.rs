@@ -7,7 +7,7 @@ pub async fn get_config(
     adapter: Arc<Adapter>,
     surface: Arc<Surface>,
     window: Arc<Window>,
-) -> (SurfaceConfiguration, Arc<TextureFormat>) {
+) -> SurfaceConfiguration {
     let size = window.inner_size();
     let format = surface.get_preferred_format(&adapter).unwrap();
     let config = SurfaceConfiguration {
@@ -17,5 +17,5 @@ pub async fn get_config(
         height: size.height,
         present_mode: wgpu::PresentMode::Mailbox,
     };
-    (config, Arc::new(format))
+    config
 }

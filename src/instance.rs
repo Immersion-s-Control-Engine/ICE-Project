@@ -3,7 +3,7 @@ use std::sync::Arc;
 use wgpu::{self, *};
 use winit::window::Window;
 
-pub async fn get_instance(window: Arc<Window>) -> (Arc<Instance>, Arc<Surface>, Arc<Adapter>) {
+pub async fn get_instance(window: Arc<Window>) -> (Arc<Surface>, Arc<Adapter>) {
     let instance = Instance::new(Backends::VULKAN);
     let surface = unsafe { instance.create_surface::<Window>(window.as_ref()) };
     let adapter = instance
@@ -14,5 +14,5 @@ pub async fn get_instance(window: Arc<Window>) -> (Arc<Instance>, Arc<Surface>, 
         })
         .await
         .expect("Failed to find appropriate Adapter!");
-    (Arc::new(instance), Arc::new(surface), Arc::new(adapter))
+    (Arc::new(surface), Arc::new(adapter))
 }

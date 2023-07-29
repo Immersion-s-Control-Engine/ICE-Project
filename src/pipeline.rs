@@ -4,17 +4,44 @@ use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::{ortho, perspective, Matrix4, Point3, Rad, Vector3};
 use std::{f32::consts::PI, mem, sync::Arc};
 use wgpu::{self, util::DeviceExt, *};
+
+const ANIMATION_SPEED: f32 = 1.0;
+const IS_PERSPECTIVE: bool = true;
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-struct Vertex {
-    position: [f32; 4],
+pub struct Light {
     color: [f32; 4],
+    specular_color: [f32; 4],
+    ambient_intensity: f32,
+    diffuse_intensity: f32,
+    specular_intensity: f32,
+    specular_shininess: f32,
 }
 
-fn vertex(p: [i8; 3], c: [i8; 3]) -> Vertex {
+pub fn light(c: [f32; 3], sc: [f32; 3], ai: f32, di: f32, si: f32, ss: f32) -> Light {
+    Light {
+        color: [c[0], c[1], c[2], 1.0],
+        specular_color: [sc[0], sc[1], sc[2], 1.0],
+        ambient_intensity: ai,
+        diffuse_intensity: di,
+        specular_intensity: si,
+        specular_shininess: ss,
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct Vertex {
+    pub position: [f32; 4],
+    pub normal: [f32; 4],
+}
+
+#[allow(dead_code)]
+pub fn vertex(p: [i8; 3], n: [i8; 3]) -> Vertex {
     Vertex {
         position: [p[0] as f32, p[1] as f32, p[2] as f32, 1.0],
-        color: [c[0] as f32, c[1] as f32, c[2] as f32, 1.0],
+        normal: [n[0] as f32, n[1] as f32, n[2] as f32, 1.0],
     }
 }
 
@@ -39,63 +66,132 @@ impl Vertex {
     }
 }
 
-const IS_PERSPECTIVE: bool = true;
-
 pub fn get_render_pipeline(
     device: Arc<Device>,
     shader: Arc<ShaderModule>,
+    queue: Arc<Queue>,
     config: &SurfaceConfiguration,
+    light_data: Light,
 ) -> (
     Arc<RenderPipeline>,
     Buffer,
-    Buffer,
     BindGroup,
+    Buffer,
     Matrix4<f32>,
     Matrix4<f32>,
-    Matrix4<f32>,
+    u32,
 ) {
     let camera_position = (3.0, 1.5, 3.0).into();
     let look_direction = (0.0, 0.0, 0.0).into();
     let up_direction = cgmath::Vector3::unit_y();
 
     let model_mat = create_transforms([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
-    let (view_mat, project_mat, view_project_mat) = create_view_projection(
+    let (view_mat, project_mat, _) = create_view_projection(
         camera_position,
         look_direction,
         up_direction,
         config.width as f32 / config.height as f32,
         IS_PERSPECTIVE,
     );
-    let mvp_mat = view_project_mat * model_mat;
-
-    let mvp_ref: &[f32; 16] = mvp_mat.as_ref();
-    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Uniform Buffer"),
-        contents: bytemuck::cast_slice(mvp_ref),
+    // create vertex uniform buffer
+    // model_mat and view_projection_mat will be stored in vertex_uniform_buffer inside the update function
+    let vertex_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Vertex Uniform Buffer"),
+        size: 192,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
     });
+
+    // create fragment uniform buffer. here we set eye_position = camera_position and light_position = eye_position
+    let fragment_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Fragment Uniform Buffer"),
+        size: 32,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    // store light and eye positions
+    let light_position: &[f32; 3] = camera_position.as_ref();
+    let eye_position: &[f32; 3] = camera_position.as_ref();
+    queue.write_buffer(
+        &fragment_uniform_buffer,
+        0,
+        bytemuck::cast_slice(light_position),
+    );
+    queue.write_buffer(
+        &fragment_uniform_buffer,
+        16,
+        bytemuck::cast_slice(eye_position),
+    );
+
+    // create light uniform buffer
+    let light_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Light Uniform Buffer"),
+        size: 48,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    // store light parameters
+    queue.write_buffer(
+        &light_uniform_buffer,
+        0,
+        bytemuck::cast_slice(&[light_data]),
+    );
 
     let uniform_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
             label: Some("Uniform Bind Group Layout"),
         });
 
     let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         layout: &uniform_bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: uniform_buffer.as_entire_binding(),
-        }],
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: vertex_uniform_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: fragment_uniform_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: light_uniform_buffer.as_entire_binding(),
+            },
+        ],
         label: Some("Uniform Bind Group"),
     });
 
@@ -128,10 +224,8 @@ pub fn get_render_pipeline(
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
             strip_index_format: None,
-            //cull_mode: Some(wgpu::Face::Back),
             ..Default::default()
         },
-        //depth_stencil: None,
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth24Plus,
             depth_write_enabled: true,
@@ -142,21 +236,23 @@ pub fn get_render_pipeline(
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
+    let vertex_data = create_vertices();
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex Buffer"),
-        contents: cast_slice(&create_vertices()),
+        contents: cast_slice(&vertex_data),
         usage: wgpu::BufferUsages::VERTEX,
     });
+    let num_vertices = vertex_data.len() as u32;
 
     (
         Arc::new(pipeline),
         vertex_buffer,
-        uniform_buffer,
         uniform_bind_group,
-        model_mat,
+        vertex_uniform_buffer,
         view_mat,
         project_mat,
+        num_vertices,
     )
 }
 
