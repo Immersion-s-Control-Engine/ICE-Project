@@ -28,6 +28,7 @@ pub struct State {
     vertex_uniform_buffer: Buffer,
     view_mat: Matrix4<f32>,
     project_mat: Matrix4<f32>,
+    num_vertices: u32,
 }
 
 pub struct InitWgpu {
@@ -58,7 +59,7 @@ impl State {
     pub async fn new(window: Arc<Window>) -> Self {
         let init = InitWgpu::new(window).await;
         let shader = get_shaders(init.device.clone());
-        let light_data = light([1.0, 0.0, 0.0], [1.0, 1.0, 0.0], 0.1, 0.8, 0.3, 33.0);
+        let light_data = light([1.0, 0.0, 0.0], [1.0, 1.0, 1.0], 0.1, 0.6, 0.3, 30.0);
 
         // uniform data
         let (
@@ -85,6 +86,7 @@ impl State {
             vertex_uniform_buffer,
             view_mat,
             project_mat,
+            num_vertices,
         }
     }
 
@@ -196,7 +198,7 @@ impl State {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.draw(0..36, 0..1);
+            render_pass.draw(0..self.num_vertices, 0..1);
         }
 
         self.init.queue.submit(iter::once(encoder.finish()));

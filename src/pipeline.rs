@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::vertex_data;
+use crate::vertex_data::sphere_data;
 use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::{ortho, perspective, Matrix4, Point3, Rad, Vector3};
 use std::{f32::consts::PI, mem, sync::Arc};
@@ -38,10 +38,10 @@ pub struct Vertex {
 }
 
 #[allow(dead_code)]
-pub fn vertex(p: [i8; 3], n: [i8; 3]) -> Vertex {
+pub fn vertex(p: [f32; 3], n: [f32; 3]) -> Vertex {
     Vertex {
-        position: [p[0] as f32, p[1] as f32, p[2] as f32, 1.0],
-        normal: [n[0] as f32, n[1] as f32, n[2] as f32, 1.0],
+        position: [p[0], p[1], p[2], 1.0],
+        normal: [n[0], n[1], n[2], 1.0],
     }
 }
 
@@ -85,7 +85,7 @@ pub fn get_render_pipeline(
     let look_direction = (0.0, 0.0, 0.0).into();
     let up_direction = cgmath::Vector3::unit_y();
 
-    let model_mat = create_transforms([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
+    let _model_mat = create_transforms([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
     let (view_mat, project_mat, _) = create_view_projection(
         camera_position,
         look_direction,
@@ -236,7 +236,7 @@ pub fn get_render_pipeline(
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
-    let vertex_data = create_vertices();
+    let vertex_data = create_vertices(2.0, 15, 30);
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex Buffer"),
@@ -256,9 +256,19 @@ pub fn get_render_pipeline(
     )
 }
 
-fn create_vertices() -> Vec<Vertex> {
+/*fn create_vertices() -> Vec<Vertex> {
     let pos = vertex_data::cube_positions();
     let normal = vertex_data::cube_normals();
+    let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
+    for i in 0..pos.len() {
+        data.push(vertex(pos[i], normal[i]));
+    }
+    data.to_vec()
+}
+Used for cubes
+*/
+fn create_vertices(r: f32, u: usize, v: usize) -> Vec<Vertex> {
+    let (pos, normal, _uvs) = sphere_data(r, u, v);
     let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
     for i in 0..pos.len() {
         data.push(vertex(pos[i], normal[i]));
