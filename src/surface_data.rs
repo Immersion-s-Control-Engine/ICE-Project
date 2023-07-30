@@ -1,7 +1,205 @@
 #![allow(dead_code)]
 use cgmath::*;
 mod colormap;
+use std::f32::consts::PI;
+#[path = "./math_func.rs"]
+mod math_func;
 
+pub struct ParametricSurface {
+    pub f: fn(f32, f32, [f32; 5]) -> [f32; 3],
+    pub umin: f32,
+    pub umax: f32,
+    pub vmin: f32,
+    pub vmax: f32,
+    pub u_segments: usize,
+    pub v_segments: usize,
+    pub scale: f32,
+    pub aspect: f32,
+    pub use_colormap: bool,
+    pub colormap_name: &'static str,
+    pub colormap_direction: &'static str,
+    pub color: [f32; 3],
+    pub params: [f32; 5],
+}
+
+impl Default for ParametricSurface {
+    fn default() -> Self {
+        ParametricSurface {
+            f: math_func::torus,
+            umin: 0.0,
+            umax: 2.0 * PI,
+            vmin: 0.0,
+            vmax: 2.0 * PI,
+            u_segments: 32,
+            v_segments: 24,
+            scale: 1.5,
+            aspect: 1.0,
+            use_colormap: true,
+            colormap_name: "jet",
+            colormap_direction: "y",
+            color: [1.0, 0.0, 0.0],
+            params: [1.0, 0.3, 0.0, 0.0, 0.0],
+        }
+    }
+}
+
+impl ParametricSurface {
+    pub fn new(ps: ParametricSurface) -> (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<u32>) {
+        let n_vertices = (ps.u_segments + 1) * (ps.v_segments + 1);
+        let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n_vertices);
+        let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n_vertices);
+        let mut colors: Vec<[f32; 3]> = Vec::with_capacity(n_vertices);
+
+        let du = (ps.umax - ps.umin) / ps.u_segments as f32;
+        let dv = (ps.vmax - ps.vmin) / ps.v_segments as f32;
+
+        let eps = 0.00001;
+        let mut p0: Vector3<f32>;
+        let mut p1: Vector3<f32>;
+        let mut p2: Vector3<f32>;
+        let mut p3: Vector3<f32>;
+        let mut pa: [f32; 3];
+
+        let mut cd = 1;
+        if ps.colormap_direction == "x" {
+            cd = 0;
+        } else if ps.colormap_direction == "z" {
+            cd = 2;
+        }
+
+        let (min, max) = parametric_surface_range(
+            ps.f,
+            ps.umin,
+            ps.umax,
+            ps.vmin,
+            ps.vmax,
+            ps.u_segments,
+            ps.v_segments,
+            ps.scale,
+            ps.aspect,
+            ps.params,
+            cd,
+        );
+
+        for i in 0..=ps.u_segments {
+            let u = ps.umin + i as f32 * du;
+            for j in 0..=ps.v_segments {
+                let v = ps.vmin + j as f32 * dv;
+                pa = (ps.f)(u, v, ps.params);
+                p0 = Vector3::new(
+                    pa[0] * ps.scale,
+                    ps.scale * ps.aspect * pa[1],
+                    ps.scale * pa[2],
+                );
+
+                // calculate normals
+                if u - eps >= 0.0 {
+                    pa = (ps.f)(u - eps, v, ps.params);
+                    p1 = Vector3::new(
+                        pa[0] * ps.scale,
+                        ps.scale * ps.aspect * pa[1],
+                        ps.scale * pa[2],
+                    );
+                    p2 = p0 - p1;
+                } else {
+                    pa = (ps.f)(u + eps, v, ps.params);
+                    p1 = Vector3::new(
+                        pa[0] * ps.scale,
+                        ps.scale * ps.aspect * pa[1],
+                        ps.scale * pa[2],
+                    );
+                    p2 = p1 - p0;
+                }
+
+                if v - eps >= 0.0 {
+                    pa = (ps.f)(u, v - eps, ps.params);
+                    p1 = Vector3::new(
+                        pa[0] * ps.scale,
+                        ps.scale * ps.aspect * pa[1],
+                        ps.scale * pa[2],
+                    );
+                    p3 = p0 - p1;
+                } else {
+                    pa = (ps.f)(u, v + eps, ps.params);
+                    p1 = Vector3::new(
+                        pa[0] * ps.scale,
+                        ps.scale * ps.aspect * pa[1],
+                        ps.scale * pa[2],
+                    );
+                    p3 = p1 - p0;
+                }
+                let normal = p3.cross(p2).normalize();
+
+                // calculate colrmap
+                let mut color = ps.color;
+                if ps.use_colormap {
+                    color = colormap::color_interp(ps.colormap_name, min, max, p0[cd]);
+                }
+
+                positions.push(p0.into());
+                normals.push(normal.into());
+                colors.push(color);
+            }
+        }
+
+        let n_faces = ps.u_segments * ps.v_segments;
+        let n_triangles = n_faces * 2;
+        let n_indices = n_triangles * 3;
+
+        let mut indices: Vec<u32> = Vec::with_capacity(n_indices);
+
+        let n_vertices_per_row = ps.v_segments + 1;
+
+        for i in 0..ps.u_segments {
+            for j in 0..ps.v_segments {
+                let idx0 = j + i * n_vertices_per_row;
+                let idx1 = j + 1 + i * n_vertices_per_row;
+                let idx2 = j + 1 + (i + 1) * n_vertices_per_row;
+                let idx3 = j + (i + 1) * n_vertices_per_row;
+
+                indices.push(idx0 as u32);
+                indices.push(idx1 as u32);
+                indices.push(idx2 as u32);
+
+                indices.push(idx2 as u32);
+                indices.push(idx3 as u32);
+                indices.push(idx0 as u32);
+            }
+        }
+        (positions, normals, colors, indices)
+    }
+}
+
+fn parametric_surface_range(
+    f: fn(f32, f32, [f32; 5]) -> [f32; 3],
+    umin: f32,
+    umax: f32,
+    vmin: f32,
+    vmax: f32,
+    nu: usize,
+    nv: usize,
+    scale: f32,
+    aspect: f32,
+    params: [f32; 5],
+    dir: usize,
+) -> (f32, f32) {
+    let du = (umax - umin) / nu as f32;
+    let dv = (vmax - vmin) / nv as f32;
+    let mut min: f32 = std::f32::MAX;
+    let mut max: f32 = std::f32::MIN;
+
+    for i in 0..=nu {
+        let u = umin + i as f32 * du;
+        for j in 0..=nv {
+            let v = vmin + j as f32 * dv;
+            let mut pt = f(u, v, params);
+            pt = [pt[0] * scale, scale * aspect * pt[1], scale * pt[2]];
+            min = if pt[dir] < min { pt[dir] } else { min };
+            max = if pt[dir] > max { pt[dir] } else { max };
+        }
+    }
+    return (min, max);
+}
 pub fn simple_surface_colors(
     pts: &Vec<Vec<[f32; 3]>>,
     nx: usize,

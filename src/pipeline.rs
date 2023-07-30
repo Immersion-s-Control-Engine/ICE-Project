@@ -5,11 +5,10 @@ use cgmath::{ortho, perspective, Matrix4, Point3, Rad, Vector3};
 use std::{f32::consts::PI, mem, sync::Arc};
 use wgpu::{self, util::DeviceExt, *};
 
-use self::math_func::{peaks, sinc};
 #[path = "math_func.rs"]
 mod math_func;
-#[path = "surface_data.rs"]
-mod surface;
+#[path = "./surface_data.rs"]
+mod surface_data;
 
 const ANIMATION_SPEED: f32 = 1.0;
 const IS_PERSPECTIVE: bool = true;
@@ -95,6 +94,7 @@ pub fn get_render_pipeline(
     Matrix4<f32>,
     Matrix4<f32>,
     u32,
+    Buffer,
 ) {
     let camera_position = (3.0, 1.5, 3.0).into();
     let look_direction = (0.0, 0.0, 0.0).into();
@@ -251,26 +251,64 @@ pub fn get_render_pipeline(
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
-    let colormap_name = "jet";
-    let vertex_data = create_vertices(
-        &peaks,
-        colormap_name,
-        -3.0,
-        3.0,
-        -3.0,
-        3.0,
-        51,
-        51,
-        2.0,
-        1.0,
-    );
+    let mut function_selection = 0;
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        function_selection = args[1].parse().unwrap();
+    }
+
+    let ps_struct: surface_data::ParametricSurface;
+
+    if function_selection == 1 {
+        ps_struct = surface_data::ParametricSurface {
+            f: math_func::klein_bottle,
+            umin: 0.0,
+            umax: PI,
+            vmin: 0.0,
+            vmax: 2.0 * PI,
+            u_segments: 120,
+            v_segments: 40,
+            scale: 1.0,
+            ..Default::default()
+        };
+    } else if function_selection == 2 {
+        ps_struct = surface_data::ParametricSurface {
+            f: math_func::wellenkugel,
+            umin: 0.0,
+            umax: 14.5,
+            vmin: 0.0,
+            vmax: 5.0,
+            u_segments: 100,
+            v_segments: 50,
+            scale: 0.17,
+            colormap_name: "cool",
+            ..Default::default()
+        };
+    } else {
+        ps_struct = surface_data::ParametricSurface {
+            ..Default::default()
+        };
+    }
+
+    let (pos_data, normal_data, color_data, index_data) =
+        surface_data::ParametricSurface::new(ps_struct);
+    let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Index Buffer"),
+        contents: cast_slice(&index_data),
+        usage: wgpu::BufferUsages::INDEX,
+    });
+    let mut vertex_data: Vec<Vertex> = Vec::with_capacity(pos_data.len());
+    for i in 0..pos_data.len() {
+        vertex_data.push(vertex(pos_data[i], normal_data[i], color_data[i]));
+    }
+    vertex_data.to_vec();
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex Buffer"),
         contents: cast_slice(&vertex_data),
         usage: wgpu::BufferUsages::VERTEX,
     });
-    let num_vertices = vertex_data.len() as u32;
+    let num_vertices = index_data.len() as u32;
 
     (
         Arc::new(pipeline),
@@ -280,6 +318,7 @@ pub fn get_render_pipeline(
         view_mat,
         project_mat,
         num_vertices,
+        index_buffer,
     )
 }
 
@@ -329,10 +368,10 @@ pub fn create_vertices(
     aspect: f32,
 ) -> Vec<Vertex> {
     let (pts, yrange) =
-        surface::simple_surface_points(f, xmin, xmax, zmin, zmax, nx, nz, scale, aspect);
-    let pos = surface::simple_surface_positions(&pts, nx, nz);
-    let normal = surface::simple_surface_normals(&pts, nx, nz);
-    let color = surface::simple_surface_colors(&pts, nx, nz, yrange, colormap_name);
+        surface_data::simple_surface_points(f, xmin, xmax, zmin, zmax, nx, nz, scale, aspect);
+    let pos = surface_data::simple_surface_positions(&pts, nx, nz);
+    let normal = surface_data::simple_surface_normals(&pts, nx, nz);
+    let color = surface_data::simple_surface_colors(&pts, nx, nz, yrange, colormap_name);
     let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
     for i in 0..pos.len() {
         data.push(vertex(pos[i], normal[i], color[i]));

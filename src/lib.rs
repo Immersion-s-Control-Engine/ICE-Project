@@ -17,6 +17,8 @@ use std::sync::Arc;
 use wgpu;
 use wgpu::{BindGroup, Buffer, Device, Queue, RenderPipeline, Surface, SurfaceConfiguration};
 use winit::{event::WindowEvent, window::Window};
+#[path = "./math_func.rs"]
+mod math_func;
 
 const IS_PERSPECTIVE: bool = true;
 const ANIMATION_SPEED: f32 = 1.0;
@@ -29,6 +31,7 @@ pub struct State {
     view_mat: Matrix4<f32>,
     project_mat: Matrix4<f32>,
     num_vertices: u32,
+    index_buffer: wgpu::Buffer,
 }
 
 pub struct InitWgpu {
@@ -58,7 +61,7 @@ impl InitWgpu {
 impl State {
     pub async fn new(window: Arc<Window>) -> Self {
         let init = InitWgpu::new(window).await;
-        let is_two_side: i32 = 0;
+        let is_two_side: i32 = 1;
         let shader = get_shaders(init.device.clone());
         let light_data = light([1.0, 1.0, 1.0], 0.1, 0.8, 0.4, 30.0, is_two_side);
 
@@ -71,6 +74,7 @@ impl State {
             view_mat,
             project_mat,
             num_vertices,
+            index_buffer,
         ) = get_render_pipeline(
             init.device.clone(),
             shader.clone(),
@@ -88,6 +92,7 @@ impl State {
             view_mat,
             project_mat,
             num_vertices,
+            index_buffer,
         }
     }
 
@@ -200,7 +205,8 @@ impl State {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.draw(0..self.num_vertices, 0..1);
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..self.num_vertices, 0, 0..1);
         }
 
         self.init.queue.submit(iter::once(encoder.finish()));
