@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::vertex_data::sphere_data;
+use crate::vertex_data::{sphere_data, torus_data};
 use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::{ortho, perspective, Matrix4, Point3, Rad, Vector3};
 use std::{f32::consts::PI, mem, sync::Arc};
@@ -236,7 +236,7 @@ pub fn get_render_pipeline(
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
-    let vertex_data = create_vertices(2.0, 15, 30);
+    let vertex_data = create_vertices(1.5, 0.5, 100, 50);
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex Buffer"),
@@ -267,8 +267,19 @@ pub fn get_render_pipeline(
 }
 Used for cubes
 */
-fn create_vertices(r: f32, u: usize, v: usize) -> Vec<Vertex> {
+/*fn create_vertices(r: f32, u: usize, v: usize) -> Vec<Vertex> {
     let (pos, normal, _uvs) = sphere_data(r, u, v);
+    let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
+    for i in 0..pos.len() {
+        data.push(vertex(pos[i], normal[i]));
+    }
+    data.to_vec()
+}
+Used in spheres
+*/
+/// This function is used specifically to make vertices using the data obtained from the shape functions.
+fn create_vertices(r_torus: f32, r_tube: f32, n_torus: usize, n_tube: usize) -> Vec<Vertex> {
+    let (pos, normal) = torus_data(r_torus, r_tube, n_torus, n_tube);
     let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
     for i in 0..pos.len() {
         data.push(vertex(pos[i], normal[i]));
