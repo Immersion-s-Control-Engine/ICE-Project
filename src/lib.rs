@@ -58,8 +58,9 @@ impl InitWgpu {
 impl State {
     pub async fn new(window: Arc<Window>) -> Self {
         let init = InitWgpu::new(window).await;
+        let is_two_side: i32 = 0;
         let shader = get_shaders(init.device.clone());
-        let light_data = light([1.0, 0.0, 0.0], [1.0, 1.0, 0.0], 0.1, 0.6, 0.3, 30.0);
+        let light_data = light([1.0, 1.0, 1.0], 0.1, 0.8, 0.4, 30.0, is_two_side);
 
         // uniform data
         let (
@@ -110,6 +111,7 @@ impl State {
         false
     }
 
+    // Used to update the position of the object.
     pub fn update(&mut self, dt: std::time::Duration) {
         // update uniform buffer
         let dt = ANIMATION_SPEED * dt.as_secs_f32();

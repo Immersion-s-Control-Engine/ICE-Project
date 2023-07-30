@@ -1,9 +1,15 @@
 #![allow(dead_code)]
-use crate::vertex_data::{sphere_data, torus_data};
+
 use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::{ortho, perspective, Matrix4, Point3, Rad, Vector3};
 use std::{f32::consts::PI, mem, sync::Arc};
 use wgpu::{self, util::DeviceExt, *};
+
+use self::math_func::{peaks, sinc};
+#[path = "math_func.rs"]
+mod math_func;
+#[path = "surface_data.rs"]
+mod surface;
 
 const ANIMATION_SPEED: f32 = 1.0;
 const IS_PERSPECTIVE: bool = true;
@@ -11,22 +17,29 @@ const IS_PERSPECTIVE: bool = true;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Light {
-    color: [f32; 4],
     specular_color: [f32; 4],
     ambient_intensity: f32,
     diffuse_intensity: f32,
     specular_intensity: f32,
     specular_shininess: f32,
+    is_two_side: i32,
 }
 
-pub fn light(c: [f32; 3], sc: [f32; 3], ai: f32, di: f32, si: f32, ss: f32) -> Light {
+pub fn light(
+    sc: [f32; 3],
+    ambient: f32,
+    diffuse: f32,
+    specular: f32,
+    shininess: f32,
+    two_side: i32,
+) -> Light {
     Light {
-        color: [c[0], c[1], c[2], 1.0],
         specular_color: [sc[0], sc[1], sc[2], 1.0],
-        ambient_intensity: ai,
-        diffuse_intensity: di,
-        specular_intensity: si,
-        specular_shininess: ss,
+        ambient_intensity: ambient,
+        diffuse_intensity: diffuse,
+        specular_intensity: specular,
+        specular_shininess: shininess,
+        is_two_side: two_side,
     }
 }
 
@@ -35,13 +48,15 @@ pub fn light(c: [f32; 3], sc: [f32; 3], ai: f32, di: f32, si: f32, ss: f32) -> L
 pub struct Vertex {
     pub position: [f32; 4],
     pub normal: [f32; 4],
+    pub color: [f32; 4],
 }
 
 #[allow(dead_code)]
-pub fn vertex(p: [f32; 3], n: [f32; 3]) -> Vertex {
+pub fn vertex(p: [f32; 3], n: [f32; 3], c: [f32; 3]) -> Vertex {
     Vertex {
         position: [p[0], p[1], p[2], 1.0],
         normal: [n[0], n[1], n[2], 1.0],
+        color: [c[0], c[1], c[2], 1.0],
     }
 }
 
@@ -55,8 +70,8 @@ pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
 );
 
 impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0=>Float32x4, 1=>Float32x4];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0=>Float32x4, 1=>Float32x4, 2=>Float32x4];
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -236,7 +251,19 @@ pub fn get_render_pipeline(
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
-    let vertex_data = create_vertices(1.5, 0.5, 100, 50);
+    let colormap_name = "jet";
+    let vertex_data = create_vertices(
+        &peaks,
+        colormap_name,
+        -3.0,
+        3.0,
+        -3.0,
+        3.0,
+        51,
+        51,
+        2.0,
+        1.0,
+    );
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex Buffer"),
@@ -277,12 +304,38 @@ Used for cubes
 }
 Used in spheres
 */
+/*
 /// This function is used specifically to make vertices using the data obtained from the shape functions.
 fn create_vertices(r_torus: f32, r_tube: f32, n_torus: usize, n_tube: usize) -> Vec<Vertex> {
     let (pos, normal) = torus_data(r_torus, r_tube, n_torus, n_tube);
     let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
     for i in 0..pos.len() {
         data.push(vertex(pos[i], normal[i]));
+    }
+    data.to_vec()
+}*/
+
+// This functions is used to get vertices and get the colors of the sinc surface too.
+pub fn create_vertices(
+    f: &dyn Fn(f32, f32) -> [f32; 3],
+    colormap_name: &str,
+    xmin: f32,
+    xmax: f32,
+    zmin: f32,
+    zmax: f32,
+    nx: usize,
+    nz: usize,
+    scale: f32,
+    aspect: f32,
+) -> Vec<Vertex> {
+    let (pts, yrange) =
+        surface::simple_surface_points(f, xmin, xmax, zmin, zmax, nx, nz, scale, aspect);
+    let pos = surface::simple_surface_positions(&pts, nx, nz);
+    let normal = surface::simple_surface_normals(&pts, nx, nz);
+    let color = surface::simple_surface_colors(&pts, nx, nz, yrange, colormap_name);
+    let mut data: Vec<Vertex> = Vec::with_capacity(pos.len());
+    for i in 0..pos.len() {
+        data.push(vertex(pos[i], normal[i], color[i]));
     }
     data.to_vec()
 }
